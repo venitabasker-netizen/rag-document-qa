@@ -32,7 +32,7 @@ if uploaded_file is not None:
 
     retriever=vectorstore.as_retriever(search_kwarges={"k":8})
 
-    llm =OllamaLLM(model="llama3.2")
+    llm =ChatOpenAI(model="gpt-40-mini")
 
     st.success("PDF processed successfully!")
 
