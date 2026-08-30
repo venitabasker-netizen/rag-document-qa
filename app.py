@@ -26,7 +26,7 @@ if uploaded_file is not None:
 
     chunks=text_splitter.split_documents(documents)
 
-    embeddings=OllamaEmbeddings(model="nomic-embed-text")
+    embeddings=OpenAIEmbeddings(model="text-embedding-3-sm all")
 
     vectorstore=Chroma.from_documents(documents=chunks,embedding=embeddings,collection_name="current_pdf")
 
@@ -44,7 +44,7 @@ if uploaded_file is not None:
 
        if question.strip():
 
-            search_prompt=f"""
+            searh_prompt=f"""
 you are a query understanding assistant for a PDF question-answering system.
 
 The user may ask questions in english,tamil,tanglish or mixed language.
