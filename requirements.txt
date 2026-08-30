@@ -3,3 +3,4 @@ langchain-community==0.3.27
 langchain-openai
 chromadb
 pypdf
+langchain-ollama
