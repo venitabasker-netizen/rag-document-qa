@@ -26,7 +26,7 @@ if uploaded_file is not None:
 
     chunks=text_splitter.split_documents(documents)
 
-    embeddings=OpenAIEmbeddings(model="text-embedding-3-sm all")
+    embeddings=OpenAIEmbeddings(model="text-embedding-3-small")
 
     vectorstore=Chroma.from_documents(documents=chunks,embedding=embeddings,collection_name="current_pdf")
 
