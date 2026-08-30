@@ -1,0 +1,1 @@
+RAG is an AI system that uses external documents to answer questions. It retrieves relevantainformation from the documents and generates an answer. RAG can be useful for studying and documents-based question answering.
