@@ -28,7 +28,7 @@ if uploaded_file is not None:
 
     embeddings=OpenAIEmbeddings(model="text-embedding-3-small")
 
-    vectorstore=Chroma.from_documents(documents=chunks,embedding=embeddings,collection_name="current_pdf")
+    vector_store=Chroma.from_documents(documents=strings,embedding=embeddings)
 
     retriever=vectorstore.as_retriever(search_kwarges={"k":8})
 
