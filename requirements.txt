@@ -4,3 +4,4 @@ langchain-openai
 chromadb
 pypdf
 langchain-ollama
+langchain-chroma
