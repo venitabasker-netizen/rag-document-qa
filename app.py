@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader
-from langchain_openai import ChatOpenAI
+from langchain_huggingfacae import HuggingFaceEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import OpenAIEmbeddings
 from langchain_chroma import Chroma 
@@ -26,7 +26,7 @@ if uploaded_file is not None:
 
     chunks=text_splitter.split_documents(documents)
 
-    embeddings=OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings=HuggingFaceEmbeddings(model="sentence-transformers/all-MiniLM-L6-v2")
 
     vector_store=Chroma.from_documents(documents=chunks,embedding=embeddings)
 
