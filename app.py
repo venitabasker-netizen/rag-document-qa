@@ -28,9 +28,9 @@ if uploaded_file is not None:
 
     embeddings=OpenAIEmbeddings(model="text-embedding-3-small")
 
-    vector_store=Chroma.from_documents(documents=docs,embedding=embeddings)
+    vector_store=Chroma.from_documents(documents=chunks,embedding=embeddings)
 
-    retriever=vectorstore.as_retriever(search_kwarges={"k":8})
+    retriever=vector_store.as_retriever(search_kwarges={"k":8})
 
     llm =ChatOpenAI(model="gpt-40-mini")
 
