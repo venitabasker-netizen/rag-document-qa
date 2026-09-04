@@ -1,7 +1,6 @@
 streamlit
 langchain-community
 langchain-ollama
-langchain-openai
 langchain-text-splitters
 langchain-chroma
 sentence-transformers
