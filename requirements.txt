@@ -1,10 +1,6 @@
 streamlit
 langchain-community
-langchain-ollama
+langchain-google-genai
 langchain-text-splitters
 langchain-chroma
-sentence-transformers
-langchain-huggingface
 pypdf
-openai
-transformers
