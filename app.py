@@ -8,8 +8,7 @@ from langchain_text_splitters import
 RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 import tempfile
-st.set_page_config(page_title="AI Document
-Q&A", page_icon="📄", layout="centered")
+st.set_page_config(page_title="AI Document Q&A", page_icon="📄", layout="centered")
 st.title("📄 AI-Powered Document Question
 Answering System")
 st.write("Upload any PDF and ask questions
