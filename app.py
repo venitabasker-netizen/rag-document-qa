@@ -3,53 +3,86 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain_openai import OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_openai import ChatOpenAI
-from langchain_chroma import Chroma 
+from langchain_chroma import Chroma
+from openai import RateLimitError
 import tempfile
+import time
 
-st.set_page_config(page_title="AI Document Q&A",page_icon="📜",layout="centered")
+st.set_page_config(page_title="AI Document Q&A", page_icon="📄", layout="centered")
 
-st.title("📜AI-Powered Document Question Answering System")
+st.title("📄 AI-Powered Document Question Answering System")
 
-st.write("Upload any PDF and ask questions in English,Tamil, or mixed-language")
+st.write("Upload any PDF and ask questions in English, Tamil, or mixed-language")
 
-uploaded_file=st.file_uploader("uploaded your any PDF",type=["pdf"])
+uploaded_file = st.file_uploader("Upload your any PDF", type=["pdf"])
 
 if uploaded_file is not None:
-    with tempfile.NamedTemporaryFile(delete=False,suffix=".pdf")as temp_file:temp_file.write(uploaded_file.getvalue())
-    pdf_path=temp_file.name
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
+        temp_file.write(uploaded_file.read())
+        pdf_path = temp_file.name
 
-    loader=PyPDFLoader(pdf_path)
+    loader = PyPDFLoader(pdf_path)
 
-    documents=loader.load()
+    documents = loader.load()
 
-    text_splitter=RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200)
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
 
-    chunks=text_splitter.split_documents(documents)
+    chunks = text_splitter.split_documents(documents)
 
-    embeddings=OpenAIEmbeddings(model="text-embedding-3-small")
+    embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
 
-    vector_store=Chroma.from_documents(documents=chunks,embedding=embeddings)
+    # --- Fix: build the vector store in small batches with retry/backoff
+    # so a temporary rate limit (or a burst of tokens) doesn't kill the app.
+    def build_vector_store(chunks, embeddings, batch_size=20, max_retries=5):
+        vector_store = None
+        progress = st.progress(0, text="Embedding document...")
+        total = len(chunks)
+        for i in range(0, total, batch_size):
+            batch = chunks[i:i + batch_size]
+            for attempt in range(max_retries):
+                try:
+                    if vector_store is None:
+                        vector_store = Chroma.from_documents(documents=batch, embedding=embeddings)
+                    else:
+                        vector_store.add_documents(batch)
+                    break
+                except RateLimitError:
+                    wait = 2 ** attempt
+                    st.warning(f"Rate limited by OpenAI, retrying in {wait}s... (attempt {attempt + 1}/{max_retries})")
+                    time.sleep(wait)
+            else:
+                st.error(
+                    "Failed to embed the document after multiple retries.\n\n"
+                    "This usually means your OpenAI account has no available quota. "
+                    "Check platform.openai.com → Settings → Billing to confirm you have credits, "
+                    "then try again."
+                )
+                st.stop()
+            progress.progress(min((i + batch_size) / total, 1.0), text="Embedding document...")
+        progress.empty()
+        return vector_store
 
-    retriever=vector_store.as_retriever(search_kwarges={"k":8})
+    vector_store = build_vector_store(chunks, embeddings)
 
-    llm =ChatOpenAI(model="gpt-40-mini")
+    # Fix: was "search_kwarges" (typo) -> "search_kwargs"
+    retriever = vector_store.as_retriever(search_kwargs={"k": 8})
+
+    llm = ChatOpenAI(model="gpt-4o-mini")
 
     st.success("PDF processed successfully!")
 
-    st.write("Uploaded PDF:",uploaded_file.name)
+    st.write("Uploaded PDF:", uploaded_file.name)
 
-    question=st.text_input("💭Ask a question about the PDF:") 
+    question = st.text_input("🔎 Ask a question about the PDF:")
 
     if st.button("Ask"):
+        if question.strip():
+            search_prompt = f"""
+You are a query understanding assistant for a PDF question-answering system.
 
-       if question.strip():
+The user may ask questions in english, tamil, tanglish or mixed language.
 
-            searh_prompt=f"""
-you are a query understanding assistant for a PDF question-answering system.
-
-The user may ask questions in english,tamil,tanglish or mixed language.
-
-understand the user's meaning,not just the exact words.
+Understand the user's meaning, not just the exact words.
 
 Handle:
 -spelling mistakes
@@ -59,50 +92,46 @@ Handle:
 -related words
 -english and tamil mixed questions
 
-if the user uses a short subject names,match it with the complete subject name in the PDF.
+If the user uses a short subject name, match it with the complete subject name in the document.
 
-for example:
+For example:
 "English exam" may refer to "English communication"
 if the PDF contains that subject.
 
-if the question asks about an exam,consider the subject name,exam name,date.day,time,and schedule.
+If the question asks about an exam, consider the subject name, exam name, date, day, time.
 
-return ONLY the best english search query.
-do not answer the question.
-do not explain anything
-    
+Return ONLY the best english search query.
+Do not answer the question.
+Do not explain anything
+
 User question:
 {question}
 
 English search query:
- """
+"""
+            search_query = llm.invoke(search_prompt)
 
-            search_query=llm.invoke(search_prompt)
-
-            if hasattr(search_query,"content"):
-                search_query=search_query.content
+            if hasattr(search_query, "content"):
+                search_query = search_query.content
             else:
-                search_query=str(search_query)
+                search_query = str(search_query)
 
-            search_query=search_query.strip()
-    
-            relevant_documents=retriever.invoke(search_query)
+            search_query = search_query.strip()
 
-            relevant_context="\n\n".join(document.page_content for document in relevant_documents)
+            relevant_documents = retriever.invoke(search_query)
 
-            sources=set()
+            relevant_context = "\n\n".join(document.page_content for document in relevant_documents)
+
+            sources = set()
 
             for document in relevant_documents:
+                page_number = document.metadata.get("page", 0) + 1
+                sources.add(f"Page {page_number}")
 
-                page_number=document.metadata.get("page",0)+1
+            prompt = f"""
+You are a precise document question-answering assistant.
 
-                sources.add(f"Page{page_number}")
-
-            prompt=f"""
-
-you are a precise document question-answering assistant.
-
-use ONLY information form the retrieved document context.
+Use ONLY information from the retrieved document context.
 
 PDF CONTEXT:
 {relevant_context}
@@ -112,57 +141,47 @@ USER QUESTION:
 
 Give the actual answer to the user's question based on the pdf context.
 
-Asnwer the user's question using the pdf context.
+Answer the user's question using the pdf context.
 
-important rules:
-1.DO NOT repeat the user's question as the answer
-2.do not describe what the user askwe.
-3.give the actual information found in the pdf.
-4.if the user asks whar the document contains,summarize the main content of the doucment.
-5.if the user asks to expplain something,explain that topic using the pdf.
-6.answer in the same language style as the user's question.
-7.if the user writes tanglish,answer in simple tanglish.
-8.do not invent information.
-9.if the requested information is not available in the PDF context,say:
-I could not find the answer in the Document
-10.Never repeat the user' question as the answer.
+Important rules:
+1. DO NOT repeat the user's question as the answer
+2. Do not describe what the user asked.
+3. Give the actual information found in the pdf.
+4. If the user asks what the document contains, summarize the main content of the document.
+5. If the user asks to explain something, explain that topic using the pdf.
+6. Answer in the same language style as the user's question.
+7. If the user writes tanglish, answer in simple tanglish.
+8. Do not invent information.
+9. If the requested information is not available in the PDF context, say:
+"I could not find the answer in the Document"
+10. Never repeat the user's question as the answer.
 
-
-FIINAL ANSWER:
+FINAL ANSWER:
 """
 
             st.write("Generating answer....")
 
-            answer=llm.invoke(prompt)
+            answer = llm.invoke(prompt)
 
-            if hasattr(answer,"content"):
-                answer=answer.content
-            else:  
-                answer=str(answer)
+            if hasattr(answer, "content"):
+                answer = answer.content
+            else:
+                answer = str(answer)
 
-            st.subheader("🤖Answer")
+            st.subheader("🤖 Answer")
 
             st.info(answer.strip())
 
             if sources:
+                st.subheader("📚 Source")
 
-                st.subheader("📚Source")
-
-                st.write(f"Document:{uploaded_file.name}")
+                st.write(f"Document: {uploaded_file.name}")
 
                 st.write("Pages used:")
 
                 for source in sorted(sources):
-
-                    st.write(f".{source}")
-
+                    st.write(f"- {source}")
             else:
-
-                st.warning("Please enter a question.")
-    
-
-
-
-
-
-   
+                st.write("No sources found.")
+        else:
+            st.warning("Please enter a question.")
