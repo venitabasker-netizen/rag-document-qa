@@ -1,6 +1,7 @@
 streamlit
 langchain-community
-langchain-google-genai
+langchain-openai
 langchain-text-splitters
 langchain-chroma
 pypdf
+openai
