@@ -2,7 +2,6 @@ import streamlit as st
 from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_openai import ChatOpenAI
 from langchain_chroma import Chroma
 from openai import RateLimitError
 import tempfile
@@ -66,8 +65,6 @@ if uploaded_file is not None:
 
     # Fix: was "search_kwarges" (typo) -> "search_kwargs"
     retriever = vector_store.as_retriever(search_kwargs={"k": 8})
-
-    llm = ChatOpenAI(model="gpt-4o-mini")
 
     st.success("PDF processed successfully!")
 
