@@ -26,7 +26,7 @@ if uploaded_file is not None:
     chunks = text_splitter.split_documents(documents)
 
     embeddings = GoogleGenerativeAIEmbeddings(
-        model="models/text-embedding-001",
+        model="models/embedding-001",
         google_api_key=GEMINI_API_KEY,
     )
     vector_store = Chroma.from_documents(documents=chunks, embedding=embeddings)
